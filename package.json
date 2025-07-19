@@ -1,5 +1,5 @@
 {
-  "name": "express-mcp",
+  "name": "@thinkers/express-mcp",
   "version": "0.0.1",
   "description": "A lightweight TypeScript middleware that transforms Express.js REST APIs into Model Context Protocol (MCP) compatible endpoints while keeping REST functionality intact.",
   "main": "dist/index.js",
