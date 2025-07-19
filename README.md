@@ -9,7 +9,7 @@ A lightweight TypeScript middleware that transforms Express.js REST APIs into **
 ## 📦 Installation
 
 ```bash
-npm install express-mcp
+npm install @thinkerscool/express-mcp
 ```
 
 **Peer Dependencies:**
