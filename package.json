@@ -1,0 +1,102 @@
+{
+  "name": "express-mcp",
+  "version": "0.0.1",
+  "description": "A lightweight TypeScript middleware that transforms Express.js REST APIs into Model Context Protocol (MCP) compatible endpoints while keeping REST functionality intact.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "clean": "rimraf dist",
+    "prepublishOnly": "npm run clean && npm run build",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "dev": "ts-node-dev --respawn --transpile-only src/examples/basic.ts",
+    "example:basic": "ts-node src/examples/basic.ts",
+    "example:advanced": "ts-node src/examples/advanced.ts"
+  },
+  "keywords": [
+    "express",
+    "mcp",
+    "model-context-protocol",
+    "middleware",
+    "rest-api",
+    "typescript",
+    "nodejs",
+    "ai",
+    "llm",
+    "json-rpc"
+  ],
+  "author": {
+    "name": "thinkers.cool",
+    "url": "https://github.com/thinkers-cool/express-mcp"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thinkers-cool/express-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/thinkers-cool/express-mcp/issues"
+  },
+  "homepage": "https://github.com/thinkers-cool/express-mcp#readme",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "peerDependencies": {
+    "express": "^4.18.0 || ^5.0.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/jest": "^29.5.8",
+    "@types/node": "^20.9.0",
+    "@typescript-eslint/eslint-plugin": "^6.12.0",
+    "@typescript-eslint/parser": "^6.12.0",
+    "eslint": "^8.54.0",
+    "express": "^4.18.2",
+    "jest": "^29.7.0",
+    "rimraf": "^5.0.5",
+    "ts-jest": "^29.1.1",
+    "ts-node": "^10.9.1",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.2.2"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/__tests__/**/*.test.ts"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.ts",
+      "!src/examples/**",
+      "!src/**/*.d.ts"
+    ]
+  },
+  "eslintConfig": {
+    "parser": "@typescript-eslint/parser",
+    "plugins": [
+      "@typescript-eslint"
+    ],
+    "extends": [
+      "eslint:recommended",
+      "@typescript-eslint/recommended"
+    ],
+    "env": {
+      "node": true,
+      "es2020": true
+    },
+    "rules": {
+      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-unused-vars": "error"
+    }
+  }
+} 
