@@ -3,12 +3,13 @@
  * This shows more sophisticated features like resources, custom handlers, and organization patterns
  */
 
-import { registerMCPTool, configureMCP, schemas, getMCPRegistry } from '../index';
+import express from 'express';
+import { registerMCPTool, configureMCP, schemas, getMCPRegistry, createMCPMiddleware } from '../index';
 
-// Advanced configuration with resources
+// Advanced configuration with resources and prompts
 configureMCP({
   serverName: 'advanced-api-server',
-  serverVersion: '2.0.0',
+  serverVersion: '1.0.0',
   basePath: '/mcp',
   resources: [
     {
@@ -30,10 +31,60 @@ configureMCP({
       mimeType: 'application/json'
     }
   ],
+  prompts: [
+    {
+      name: 'code_review_prompt',
+      description: 'Generate a comprehensive code review prompt with best practices',
+      arguments: [
+        {
+          name: 'language',
+          description: 'Programming language of the code to review',
+          required: true
+        },
+        {
+          name: 'focus_areas',
+          description: 'Specific areas to focus on (security, performance, maintainability)',
+          required: false
+        }
+      ]
+    },
+    {
+      name: 'api_documentation_prompt',
+      description: 'Create documentation prompt for API endpoints',
+      arguments: [
+        {
+          name: 'endpoint_path',
+          description: 'The API endpoint path to document',
+          required: true
+        },
+        {
+          name: 'http_method',
+          description: 'HTTP method (GET, POST, PUT, DELETE)',
+          required: true
+        }
+      ]
+    },
+    {
+      name: 'user_story_prompt',
+      description: 'Generate user story creation prompt with acceptance criteria',
+      arguments: [
+        {
+          name: 'feature_type',
+          description: 'Type of feature (authentication, reporting, data-entry)',
+          required: true
+        },
+        {
+          name: 'user_role',
+          description: 'Target user role (admin, user, guest)',
+          required: false
+        }
+      ]
+    }
+  ],
   resourceHandlers: {
     'config://server-info': async () => ({
       name: 'Advanced API Server',
-      version: '2.0.0',
+      version: '1.0.0',
       environment: 'development',
       features: ['REST', 'MCP', 'Resources', 'Custom Handlers'],
       uptime: 12345,
@@ -55,7 +106,7 @@ configureMCP({
       openapi: '3.0.0',
       info: {
         title: 'Advanced API',
-        version: '2.0.0'
+        version: '1.0.0'
       },
       paths: {
         '/api/users': {
@@ -68,6 +119,83 @@ configureMCP({
         }
       }
     })
+  },
+  promptHandlers: {
+    'code_review_prompt': async (args) => {
+      const { language, focus_areas } = args;
+      const focusAreas = focus_areas ? focus_areas.split(',').map((area: string) => area.trim()) : ['security', 'performance', 'maintainability'];
+      
+      return `## Code Review Prompt for ${language.toUpperCase()}
+
+Please conduct a comprehensive code review focusing on the following areas:
+${focusAreas.map((area: string) => `- **${area.charAt(0).toUpperCase() + area.slice(1)}**: Analyze for ${area} best practices`).join('\n')}
+
+### Review Checklist:
+1. **Code Quality**: Check for clean, readable, and maintainable code
+2. **Best Practices**: Ensure adherence to ${language} conventions
+3. **Error Handling**: Verify proper error handling and edge cases
+4. **Performance**: Look for potential performance bottlenecks
+5. **Security**: Check for security vulnerabilities and data validation
+6. **Documentation**: Ensure code is properly documented
+
+Please provide specific, actionable feedback with examples where applicable.`;
+    },
+
+    'api_documentation_prompt': async (args) => {
+      const { endpoint_path, http_method } = args;
+      
+      return `## API Documentation Prompt
+
+Generate comprehensive documentation for the following API endpoint:
+
+**Endpoint**: \`${http_method.toUpperCase()} ${endpoint_path}\`
+
+### Documentation Requirements:
+1. **Description**: Clear explanation of what this endpoint does
+2. **Parameters**: 
+   - Path parameters (if any)
+   - Query parameters (if any)
+   - Request body schema (for POST/PUT/PATCH)
+3. **Responses**: 
+   - Success response (200/201) with example
+   - Error responses (400, 401, 404, 500) with descriptions
+4. **Authentication**: Required authentication method
+5. **Rate Limiting**: Any rate limiting considerations
+6. **Example Request**: Complete curl example
+7. **Example Response**: JSON response example
+
+Please follow OpenAPI 3.0 specification format where applicable.`;
+    },
+
+    'user_story_prompt': async (args) => {
+      const { feature_type, user_role = 'user' } = args;
+      
+      return `## User Story Creation Prompt
+
+Create a well-structured user story for a ${feature_type} feature:
+
+### User Story Template:
+**As a** ${user_role}
+**I want** [to be defined based on ${feature_type}]
+**So that** [business value to be defined]
+
+### Requirements:
+1. **Acceptance Criteria**: Define clear, testable criteria using Given/When/Then format
+2. **Definition of Done**: Technical and quality requirements
+3. **Dependencies**: Any dependencies on other features or systems
+4. **Estimation**: Story point estimation with justification
+5. **Wireframes/Mockups**: If UI changes are involved
+6. **Technical Considerations**: Any technical constraints or requirements
+
+### Questions to Address:
+- What specific problem does this solve for the ${user_role}?
+- How does this ${feature_type} feature integrate with existing functionality?
+- What edge cases need to be considered?
+- What are the performance requirements?
+- What security considerations apply?
+
+Please create a comprehensive user story following agile best practices.`;
+    }
   }
 });
 
@@ -295,6 +423,157 @@ export function validateToolRegistration(toolName: string): boolean {
   return tool !== undefined;
 }
 
+// Create and configure Express app
+const app = express();
+app.use(express.json());
+
+// Add some example REST endpoints to demonstrate the full API
+app.get('/api/users', (req, res) => {
+  const { page = 1, limit = 10, filter = 'all' } = req.query;
+  const users = Array.from({ length: parseInt(limit as string) }, (_, i) => ({
+    id: (parseInt(page as string) - 1) * parseInt(limit as string) + i + 1,
+    name: `User ${(parseInt(page as string) - 1) * parseInt(limit as string) + i + 1}`,
+    email: `user${(parseInt(page as string) - 1) * parseInt(limit as string) + i + 1}@example.com`,
+    role: ['user', 'admin', 'moderator'][i % 3],
+    status: filter === 'all' ? ['active', 'inactive'][i % 2] : filter,
+    created_at: new Date(Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000).toISOString()
+  }));
+  
+  res.json({ 
+    users, 
+    pagination: { page: parseInt(page as string), limit: parseInt(limit as string), total: 1250 },
+    filter 
+  });
+});
+
+app.post('/api/users', (req, res) => {
+  const newUser = { 
+    id: Date.now(), 
+    ...req.body, 
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+  res.status(201).json({ 
+    success: true,
+    message: 'User created successfully', 
+    user: newUser 
+  });
+});
+
+app.put('/api/users/:id/profile', (req, res) => {
+  const userId = req.params.id;
+  const updatedProfile = {
+    id: userId,
+    ...req.body,
+    updated_at: new Date().toISOString()
+  };
+  res.json({
+    success: true,
+    message: 'Profile updated successfully',
+    profile: updatedProfile
+  });
+});
+
+app.post('/api/posts', (req, res) => {
+  // This endpoint will use the custom handler registered above
+  res.json({
+    success: true,
+    message: 'This endpoint handled by Express, but MCP tool uses custom handler',
+    received: req.body
+  });
+});
+
+app.get('/api/posts/search', (req, res) => {
+  const { q, category, tags = [], published_only = true } = req.query;
+  const mockPosts = Array.from({ length: 5 }, (_, i) => ({
+    id: i + 1,
+    title: `${q} related post ${i + 1}`,
+    content: `This is a sample post about ${q}...`,
+    category,
+    tags: Array.isArray(tags) ? tags : [tags].filter(Boolean),
+    published: published_only === 'true' ? true : Math.random() > 0.5,
+    created_at: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString()
+  }));
+
+  res.json({
+    posts: mockPosts,
+    query: { q, category, tags, published_only },
+    total: mockPosts.length
+  });
+});
+
+app.post('/api/analytics/report', (req, res) => {
+  // This will use the custom handler registered above
+  res.json({
+    success: true,
+    message: 'Analytics endpoint - see MCP handler for enhanced functionality',
+    received: req.body
+  });
+});
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'healthy', 
+    timestamp: new Date().toISOString(),
+    server: 'advanced-api-server',
+    version: '1.0.0'
+  });
+});
+
+// Add MCP middleware (after all route registrations)
+app.use(createMCPMiddleware());
+
 console.log('🔧 Advanced express-mcp configuration loaded');
 console.log('📊 Registry info:', getRegistryInfo());
-console.log('✅ All tools and resources registered successfully'); 
+console.log('✅ All tools, resources, and prompts registered successfully');
+
+// Start the server
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => {
+  console.log(`\n🚀 Advanced API Server running on port ${PORT}`);
+  console.log(`📡 REST API: http://localhost:${PORT}/api/`);
+  console.log(`🔌 MCP endpoint: http://localhost:${PORT}/mcp`);
+  console.log(`💚 Health check: http://localhost:${PORT}/health`);
+  console.log(`📚 Resources available: ${getMCPRegistry().getResources().length}`);
+  console.log(`🎯 Prompts available: ${getMCPRegistry().getPrompts().length}`);
+  
+  console.log('\n📋 Example MCP requests:');
+  console.log('1. Initialize (updated protocol):');
+  console.log(`   curl -X POST http://localhost:${PORT}/mcp \\`);
+  console.log(`     -H "Content-Type: application/json" \\`);
+  console.log('     -d \'{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "test-client", "version": "1.0.0"}}}\'');
+  
+  console.log('\n2. List tools:');
+  console.log(`   curl -X POST http://localhost:${PORT}/mcp \\`);
+  console.log(`     -H "Content-Type: application/json" \\`);
+  console.log('     -d \'{"jsonrpc": "2.0", "id": 2, "method": "tools/list"}\'');
+  
+  console.log('\n3. List resources:');
+  console.log(`   curl -X POST http://localhost:${PORT}/mcp \\`);
+  console.log(`     -H "Content-Type: application/json" \\`);
+  console.log('     -d \'{"jsonrpc": "2.0", "id": 3, "method": "resources/list"}\'');
+  
+  console.log('\n4. List prompts (NEW):');
+  console.log(`   curl -X POST http://localhost:${PORT}/mcp \\`);
+  console.log(`     -H "Content-Type: application/json" \\`);
+  console.log('     -d \'{"jsonrpc": "2.0", "id": 4, "method": "prompts/list"}\'');
+  
+  console.log('\n5. Get code review prompt (NEW):');
+  console.log(`   curl -X POST http://localhost:${PORT}/mcp \\`);
+  console.log(`     -H "Content-Type: application/json" \\`);
+  console.log('     -d \'{"jsonrpc": "2.0", "id": 5, "method": "prompts/get", "params": {"name": "code_review_prompt", "arguments": {"language": "javascript", "focus_areas": "security,performance"}}}\'');
+  
+  console.log('\n6. Get resource:');
+  console.log(`   curl -X POST http://localhost:${PORT}/mcp \\`);
+  console.log(`     -H "Content-Type: application/json" \\`);
+  console.log('     -d \'{"jsonrpc": "2.0", "id": 6, "method": "resources/read", "params": {"uri": "config://server-info"}}\'');
+  
+  console.log('\n7. Call advanced tool:');
+  console.log(`   curl -X POST http://localhost:${PORT}/mcp \\`);
+  console.log(`     -H "Content-Type: application/json" \\`);
+  console.log('     -d \'{"jsonrpc": "2.0", "id": 7, "method": "tools/call", "params": {"name": "create_post", "arguments": {"title": "My First Post", "content": "This is an amazing post about #technology", "category": "tech", "published": true}}}\'');
+});
+
+export { app };
+

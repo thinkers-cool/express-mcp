@@ -38,6 +38,18 @@ export interface MCPResource {
   mimeType?: string;
 }
 
+export interface MCPPrompt {
+  name: string;
+  description: string;
+  arguments?: MCPPromptArgument[];
+}
+
+export interface MCPPromptArgument {
+  name: string;
+  description: string;
+  required?: boolean;
+}
+
 // Route Registration Types
 export interface RouteDefinition {
   path: string;
@@ -52,6 +64,8 @@ export interface MCPConfig {
   basePath?: string;
   resources?: MCPResource[];
   resourceHandlers?: { [uri: string]: (params: any) => Promise<any> };
+  prompts?: MCPPrompt[];
+  promptHandlers?: { [name: string]: (args: any) => Promise<any> };
 }
 
 // Schema Helper Types
@@ -85,8 +99,10 @@ export interface MCPRegistry {
   register(definition: RouteDefinition): void;
   getTools(): MCPTool[];
   getResources(): MCPResource[];
+  getPrompts(): MCPPrompt[];
   getRoute(toolName: string): RouteDefinition | undefined;
   getConfig(): MCPConfig;
   handleResourceRead(uri: string, params?: any): Promise<any>;
+  handlePromptGet(name: string, args?: any): Promise<any>;
   clear(): void;
 } 

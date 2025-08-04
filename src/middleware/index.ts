@@ -16,6 +16,8 @@ declare global {
     }
     interface Response {
       json(body: any): void;
+      status(code: number): Response;
+      end(): void;
     }
     interface NextFunction {
       (): void;
@@ -32,6 +34,7 @@ import type {
   MCPResponse,
   MCPTool,
   MCPResource,
+  MCPPrompt,
   RouteDefinition,
   MCPConfig,
   MCPRegistry as IMCPRegistry
@@ -61,6 +64,10 @@ class MCPRegistryImpl implements IMCPRegistry {
     return this.config.resources || [];
   }
 
+  getPrompts(): MCPPrompt[] {
+    return this.config.prompts || [];
+  }
+
   getRoute(toolName: string): RouteDefinition | undefined {
     return Array.from(this.routes.values()).find(route => route.tool.name === toolName);
   }
@@ -75,6 +82,14 @@ class MCPRegistryImpl implements IMCPRegistry {
       return await handler(params);
     }
     throw new Error(`No handler for resource: ${uri}`);
+  }
+
+  async handlePromptGet(name: string, args: any = {}): Promise<any> {
+    const handler = this.config.promptHandlers?.[name];
+    if (handler) {
+      return await handler(args);
+    }
+    throw new Error(`No handler for prompt: ${name}`);
   }
 
   clear() {
@@ -131,6 +146,11 @@ export function createMCPMiddleware(config: MCPConfig = {}) {
     try {
       const mcpRequest: MCPRequest = req.body;
       
+      // Handle notifications (these don't require responses)
+      if (mcpRequest.method.startsWith('notifications/')) {
+        return handleNotification(mcpRequest, res);
+      }
+      
       switch (mcpRequest.method) {
         case 'initialize':
           return handleInitialize(mcpRequest, res);
@@ -142,6 +162,10 @@ export function createMCPMiddleware(config: MCPConfig = {}) {
           return handleResourcesList(mcpRequest, res);
         case 'resources/read':
           return handleResourceRead(mcpRequest, res);
+        case 'prompts/list':
+          return handlePromptsList(mcpRequest, res);
+        case 'prompts/get':
+          return handlePromptsGet(mcpRequest, res);
         default:
           return sendMCPError(res, mcpRequest.id, -32601, `Method not found: ${mcpRequest.method}`);
       }
@@ -160,10 +184,11 @@ function handleInitialize(request: MCPRequest, res: Response) {
     jsonrpc: '2.0',
     id: request.id,
     result: {
-      protocolVersion: '2024-11-05',
+      protocolVersion: '2025-06-18',
       capabilities: {
         tools: {},
         resources: config.resources && config.resources.length > 0 ? {} : undefined,
+        prompts: config.prompts && config.prompts.length > 0 ? {} : undefined,
       },
       serverInfo: {
         name: config.serverName || 'express-mcp-server',
@@ -265,9 +290,76 @@ async function handleResourceRead(request: MCPRequest, res: Response) {
   }
 }
 
+function handlePromptsList(request: MCPRequest, res: Response) {
+  const prompts = registry.getPrompts();
+
+  const response: MCPResponse = {
+    jsonrpc: '2.0',
+    id: request.id,
+    result: { prompts },
+  };
+  
+  res.json(response);
+}
+
+async function handlePromptsGet(request: MCPRequest, res: Response) {
+  const { name } = request.params;
+
+  try {
+    const content = await registry.handlePromptGet(name, request.params.arguments || {});
+
+    const response: MCPResponse = {
+      jsonrpc: '2.0',
+      id: request.id,
+      result: {
+        messages: [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: typeof content === 'string' ? content : JSON.stringify(content, null, 2),
+            },
+          },
+        ],
+      },
+    };
+
+    res.json(response);
+  } catch (error: any) {
+    console.error(`Error getting prompt ${name}:`, error);
+    return sendMCPError(res, request.id, -32603, error.message || 'Prompt get failed');
+  }
+}
+
+function handleNotification(request: MCPRequest, res: Response) {
+  // Handle MCP notifications
+  switch (request.method) {
+    case 'notifications/initialized':
+      // Client has finished initialization - no response required
+      console.log('MCP client initialized successfully');
+      break;
+    case 'notifications/cancelled':
+      // Request was cancelled - no response required
+      console.log('MCP request cancelled:', request.params);
+      break;
+    case 'notifications/progress':
+      // Progress update - no response required
+      console.log('MCP progress update:', request.params);
+      break;
+    default:
+      console.log(`Unknown notification: ${request.method}`, request.params);
+  }
+  
+  // Notifications don't require responses, just send 200 OK
+  res.status(200).end();
+}
+
 async function callRESTEndpoint(req: Request, routeDefinition: RouteDefinition, data: any): Promise<any> {
   const { path, method } = routeDefinition;
-  const baseURL = `http://localhost:${process.env.PORT || 3000}`;
+  
+  const protocol = req.headers['x-forwarded-proto'] || 'http';
+  const host = req.headers.host || `localhost:${process.env.PORT || 3000}`;
+  const baseURL = `${protocol}://${host}`;
   
   // Replace path parameters
   let finalPath = path;
